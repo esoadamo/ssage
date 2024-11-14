@@ -1,7 +1,15 @@
 # Super-Simple AGE
 
 A wrapper around the [age](https://pypi.org/project/age/) encryption library that makes it easier to use.
-Age stands for Actually Good Encryption, and is a modern encryption library that is easy to use and secure.
+AGE stands for Actually Good Encryption, and is a modern encryption library that is easy to use and secure.
+
+Additionally, this library provides an authenticated encryption. However, this feature is fully optional and can be disabled, achieving full compatibility with the age library.
+
+## Installation
+
+```bash
+pip install ssage
+```
 
 ## Code Example
 
