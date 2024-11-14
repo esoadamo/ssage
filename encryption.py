@@ -1,15 +1,13 @@
-from io import BytesIO
+from base64 import b64encode, b64decode
 from hashlib import sha256
+from io import BytesIO
 from secrets import token_bytes
-from json import dumps, loads
 from typing import Optional
-import bcrypt
 
 from age.cli import encrypt as age_encrypt, Decryptor as AgeDecryptor, AsciiArmoredInput, AGE_PEM_LABEL
 from age.keys.agekey import AgePrivateKey
 
-
-SSAGE_SIGNATURE_SEPARATOR = b'|SSE|'
+SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 
 
 class SSAGE:
@@ -105,23 +103,12 @@ class SSAGE:
         :param data: data to sign
         :return: Machine Authentication Code (MAC) for the data
         """
-        salt_secret = token_bytes(32)
         salt_data = token_bytes(32)
-        nonce = token_bytes(32).hex()
-        salt_data_hex = salt_data.hex()
-        salt_secret_hex = salt_secret.hex()
+        salt_data_str = b64encode(salt_data).decode('ascii')
+        hash_data = sha256(data + self.__key.private_bytes() + salt_data).digest()
+        hash_data_str = b64encode(hash_data).decode('ascii')
 
-        hash_data = sha256(data + salt_data).hexdigest()
-        hash_secret = sha256(self.__key.private_bytes() + salt_secret).hexdigest()
-        
-        signature_raw = {
-            'secret': hash_secret,
-            'secret_salt': salt_secret_hex,
-            'data': hash_data,
-            'data_salt': salt_data_hex,
-            'nonce': nonce
-        }
-        return dumps(signature_raw, separators=(',', ':')).encode('ascii')
+        return f"{hash_data_str}{salt_data_str}".encode('ascii')
 
     def __drop_and_verify_signature(self, data: bytes) -> bytes:
         """
@@ -145,14 +132,13 @@ class SSAGE:
         :param signature: signature to verify
         :return: True if the signature is valid
         """
-        signature_raw_str = self.decrypt(bytes.fromhex(signature.decode('ascii')).decode('ascii'))
-        signature_raw = loads(signature_raw_str)
+        signature_raw_str = signature.decode('ascii')
+        hash_data = b64decode(signature_raw_str[:44])
+        salt_data = b64decode(signature_raw_str[44:])
 
-        hash_data = sha256(data + bytes.fromhex(signature_raw['data_salt'])).hexdigest()
-        hash_secret = sha256(self.__key.private_bytes + bytes.fromhex(signature_raw['secret_salt'])).hexdigest()
-
-        if hash_data != signature_raw['data'] or hash_secret != signature_raw['secret']:
-            raise ValueError('Signature invalid')
+        hash_data_expected = sha256(data + self.__key.private_bytes() + salt_data).digest()
+        if hash_data != hash_data_expected:
+            raise ValueError('Signature mismatch')
 
         return True
 
@@ -193,7 +179,9 @@ if __name__ == '__main__':
         e = SSAGE(SSAGE.generate_private_key())
         encrypted = e.encrypt('Hello, world!')
         print(encrypted)
-        decrypted = e.decrypt(encrypted, authenticate=False)
+        decrypted_raw = e.decrypt(encrypted, authenticate=False)
+        print(decrypted_raw)
+        decrypted = e.decrypt(encrypted)
         print(decrypted)
         assert decrypted == 'Hello, world!'
         print('Test passed!')
