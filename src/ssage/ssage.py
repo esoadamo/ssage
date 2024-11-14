@@ -1,3 +1,4 @@
+import sys
 from base64 import b64encode, b64decode
 from hashlib import sha256
 from io import BytesIO
@@ -42,6 +43,10 @@ class SSAGE:
         data_in = BytesIO(data)
         data_out = BytesIOKeepClosedData()
 
+        if not hasattr(sys.stdout, 'buffer'):
+            # Needed for unit tests
+            sys.stdout.buffer = None
+
         age_encrypt(
             recipients=[key_public.public_string()],
             infile=data_in,
@@ -70,6 +75,10 @@ class SSAGE:
 
         data_in = AsciiArmoredInput(AGE_PEM_LABEL, BytesIO(data.encode('ascii')))
         data_out = BytesIOKeepClosedData()
+
+        if not hasattr(sys.stdout, 'buffer'):
+            # Needed for unit tests
+            sys.stdout.buffer = None
 
         with AgeDecryptor([self.__key], data_in) as decryptor:
             data_out.write(decryptor.read())
