@@ -4,12 +4,12 @@ from base64 import b64encode, b64decode
 from hashlib import sha256
 from io import BytesIO, StringIO
 from secrets import token_bytes
-from typing import Optional, List
+from typing import Optional, List, Type
 
 from age.cli import AGE_PEM_LABEL
 
-from .backend import SSAGEBackendAge
-from .backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
+from backend import SSAGEBackendAge, SSAGEBackendNative
+from backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
 
 SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 
@@ -19,7 +19,7 @@ class SSAGE:
     A simple wrapper around the AGE encryption library to provide a more user-friendly interface
     """
 
-    def __init__(self, private_key: Optional[str] = None, strip: bool = True, authenticate: Optional[bool] = None, public_key: Optional[str] = None):
+    def __init__(self, private_key: Optional[str] = None, strip: bool = True, authenticate: Optional[bool] = None, public_key: Optional[str] = None, backend: Type[SSAGEBackendAge] = SSAGEBackendNative):
         """
         Initialize the SSAGE object
         :param private_key: AGE private key, if not provided decryption and authenticated encryption will not be available
@@ -30,7 +30,7 @@ class SSAGE:
         if private_key is None and authenticate:
             raise ValueError('Private key must be provided for authenticated encryption')
 
-        self.__backend = SSAGEBackendAge(private_key, public_key)
+        self.__backend = backend(private_key, public_key)
         self.__strip = strip
         self.__authenticate = authenticate if authenticate is not None else bool(private_key)
 
