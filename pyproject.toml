@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ssage"
-version = "1.1.0"
+version = "1.2.0"
 description = "Super-Simple AGE - A wrapper around python age (actually good encryption)"
 authors = [
     { name = "Adam Hlavacek", email = "git@adamhlavacek.com" }

@@ -1,13 +1,15 @@
-import sys
 import hmac
+import sys
 from base64 import b64encode, b64decode
 from hashlib import sha256
-from io import BytesIO
+from io import BytesIO, StringIO
 from secrets import token_bytes
 from typing import Optional, List
 
-from age.cli import encrypt as age_encrypt, Decryptor as AgeDecryptor, AsciiArmoredInput, AGE_PEM_LABEL
-from age.keys.agekey import AgePrivateKey, AgePublicKey
+from age.cli import AGE_PEM_LABEL
+
+from .backend import SSAGEBackendAge
+from .backend.io_helpers import BytesIOPersistent, StringIOPersistent
 
 SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 
@@ -25,15 +27,10 @@ class SSAGE:
         :param authenticate: whether to authenticate the data, if set to False the data can be forged by anyone with the public key. Default is True if private_key is provided, False if only public_key is provided
         :param public_key: AGE public key, if not provided it will be derived from the private key
         """
-        if private_key is None and public_key is None:
-            raise ValueError('Either private_key or public_key must be provided')
-        if private_key is not None and public_key is not None:
-            raise ValueError('Only one of private_key or public_key can be provided')
         if private_key is None and authenticate:
             raise ValueError('Private key must be provided for authenticated encryption')
 
-        self.__private_key: Optional[str] = private_key
-        self.__public_key: str = public_key or self.__parse_public_key()
+        self.__backend = SSAGEBackendAge(private_key, public_key)
         self.__strip = strip
         self.__authenticate = authenticate if authenticate is not None else bool(private_key)
 
@@ -47,7 +44,7 @@ class SSAGE:
         """
         authenticate = authenticate or (authenticate is None and self.__authenticate)
         if authenticate:
-            if not self.__private_key:
+            if not self.__backend.private_key:
                 raise ValueError('Private key must be provided for authenticated encryption')
 
             signature = self.__mac(data)
@@ -57,20 +54,14 @@ class SSAGE:
             raise ValueError('Additional recipients are not supported for authenticated encryption')
 
         data_in = BytesIO(data)
-        data_out = BytesIOKeepClosedData()
+        data_out = StringIOPersistent()
 
         if not hasattr(sys.stdout, 'buffer'):
             # Needed for unit tests
             sys.stdout.buffer = None
 
-        age_encrypt(
-            recipients=[self.public_key] + (additional_recipients or []),
-            infile=data_in,
-            outfile=data_out,
-            ascii_armored=True
-        )
-        
-        ciphertext = data_out.captured_data.decode('ascii')
+        self.__backend.encrypt(data_in, data_out, additional_recipients=additional_recipients)
+        ciphertext = data_out.captured_data
 
         if self.__strip:
             ciphertext = ''.join(ciphertext.splitlines(keepends=False)[1:-1])
@@ -83,7 +74,7 @@ class SSAGE:
         :param authenticate: whether to authenticate the data, None to use the default
         :return: decrypted data
         """
-        if not self.__private_key:
+        if not self.__backend.private_key:
             raise ValueError('Private key must be provided for decryption')
 
         if self.__strip:
@@ -91,15 +82,9 @@ class SSAGE:
             data = '\n'.join([data[i:i + 64] for i in range(0, len(data), 64)])
             data = f'-----BEGIN {AGE_PEM_LABEL}-----\n{data}\n-----END {AGE_PEM_LABEL}-----\n'
 
-        data_in = AsciiArmoredInput(AGE_PEM_LABEL, BytesIO(data.encode('ascii')))
-        data_out = BytesIOKeepClosedData()
+        data_out = BytesIOPersistent()
 
-        if not hasattr(sys.stdout, 'buffer'):
-            # Needed for unit tests
-            sys.stdout.buffer = None
-
-        with AgeDecryptor([self.__private_key_instance], data_in) as decryptor:
-            data_out.write(decryptor.read())
+        self.__backend.decrypt(StringIO(data), data_out)
 
         plaintext = data_out.captured_data
         if authenticate or (authenticate is None and self.__authenticate):
@@ -133,7 +118,7 @@ class SSAGE:
         """
         salt = token_bytes(32)
         salt_str = b64encode(salt).decode('ascii')
-        hmac_data = hmac.new(self.__private_key.encode('ascii') + salt, data, sha256).digest()
+        hmac_data = hmac.new(self.__backend.private_key.encode('ascii') + salt, data, sha256).digest()
         hash_data_str = b64encode(hmac_data).decode('ascii')
 
         return f"{hash_data_str}{salt_str}".encode('ascii')
@@ -164,38 +149,11 @@ class SSAGE:
         hmac_data = b64decode(signature_raw_str[:44])
         salt = b64decode(signature_raw_str[44:])
 
-        hmac_data_expected = hmac.new(self.__private_key.encode('ascii') + salt, data, sha256).digest()
+        hmac_data_expected = hmac.new(self.__backend.private_key.encode('ascii') + salt, data, sha256).digest()
         if not hmac.compare_digest(hmac_data, hmac_data_expected):
             raise ValueError('Signature mismatch')
 
         return True
-
-    @property
-    def __private_key_instance(self) -> AgePrivateKey:
-        """
-        Get the private key
-        :return: AGE private key
-        """
-        if self.__private_key is None:
-            raise ValueError('Private key is not available')
-        return AgePrivateKey.from_private_string(self.__private_key)
-
-    @property
-    def __public_key_instance(self) -> AgePublicKey:
-        """
-        Get the public key
-        :return: AGE public key
-        """
-        if self.__public_key is None:
-            self.__public_key = self.__private_key_instance.public_key().public_string()
-        return AgePublicKey.from_public_string(self.__public_key)
-
-    def __parse_public_key(self) -> str:
-        """
-        Parse the public key from the private key
-        :return: AGE public key
-        """
-        return self.__private_key_instance.public_key().public_string()
 
     @property
     def public_key(self) -> str:
@@ -203,7 +161,7 @@ class SSAGE:
         Get the public key
         :return: AGE public key
         """
-        return self.__public_key
+        return self.__backend.public_key
 
     @staticmethod
     def generate_private_key() -> str:
@@ -211,30 +169,7 @@ class SSAGE:
         Generate a new private key
         :return: AGE private key
         """
-        return AgePrivateKey.generate().private_string()
-
-
-class BytesIOKeepClosedData(BytesIO):
-    """
-    A helper class to capture the data written to a BytesIO object when it is closed
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__captured_data = None
-
-    def close(self):
-        self.__captured_data = self.getvalue()
-        super().close()
-
-    @property
-    def captured_data(self):
-        if not self.closed:
-            return self.getvalue()
-
-        data = self.__captured_data
-        self.__captured_data = None
-        return data
+        return SSAGEBackendAge.generate_private_key()
 
 
 if __name__ == '__main__':
