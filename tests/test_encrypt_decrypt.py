@@ -20,7 +20,7 @@ class TestEncryptDecrypt(unittest.TestCase):
 
     def test_encrypt_decrypt_invalid_signature(self):
         e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", authenticate=True)
-        plaintext = "AYWE82u5DmN5D2Hewf5A7QJXAgJXAQc4pgz/385Ax2g=4NW65RjT+P4kZm3yCtycRjUJGeuWVc4UAH/Q59oM8h8=|1|Hello, world!"
+        plaintext = "XR7vUktm5nB6GK2BCvx47Fmk7N1kVOzRN8LZBaB9SoY=AmQP9nEo8jJtkeivSkjmavN7S97AYaLaDCtk7Lr8Uls=|1|Hello, world!"
         encrypted = e.encrypt(plaintext, authenticate=False)
         self.assertTrue(e.decrypt(encrypted, authenticate=False))
         self.assertTrue(e.decrypt(encrypted))
@@ -32,7 +32,7 @@ class TestEncryptDecrypt(unittest.TestCase):
 
     def test_encrypt_decrypt_forged_message(self):
         e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", authenticate=True)
-        plaintext = "AYWE82u5DmN5D2Hewf5A7QJXAgJXAQc4pgz/385Ax2g=4NW65RjT+P4kZm3yCtycRjUJGeuWVc4UAH/Q59oM8h8=|1|Hello, world!"
+        plaintext = "XR7vUktm5nB6GK2BCvx47Fmk7N1kVOzRN8LZBaB9SoY=AmQP9nEo8jJtkeivSkjmavN7S97AYaLaDCtk7Lr8Uls=|1|Hello, world!"
         plaintext = plaintext[:-1] + "."
         encrypted = e.encrypt(plaintext, authenticate=False)
         self.assertTrue(e.decrypt(encrypted, authenticate=False))

@@ -1,4 +1,5 @@
 import sys
+import hmac
 from base64 import b64encode, b64decode
 from hashlib import sha256
 from io import BytesIO
@@ -31,8 +32,8 @@ class SSAGE:
         if private_key is None and authenticate:
             raise ValueError('Private key must be provided for authenticated encryption')
 
-        self.__key: Optional[AgePrivateKey] = AgePrivateKey.from_private_string(private_key) if private_key else None
-        self.__public_key = AgePublicKey.from_public_string(public_key) if public_key else self.__key.public_key()
+        self.__private_key: Optional[str] = private_key
+        self.__public_key: str = public_key or self.__parse_public_key()
         self.__strip = strip
         self.__authenticate = authenticate if authenticate is not None else bool(private_key)
 
@@ -46,7 +47,7 @@ class SSAGE:
         """
         authenticate = authenticate or (authenticate is None and self.__authenticate)
         if authenticate:
-            if not self.__key:
+            if not self.__private_key:
                 raise ValueError('Private key must be provided for authenticated encryption')
 
             signature = self.__mac(data)
@@ -82,7 +83,7 @@ class SSAGE:
         :param authenticate: whether to authenticate the data, None to use the default
         :return: decrypted data
         """
-        if not self.__key:
+        if not self.__private_key:
             raise ValueError('Private key must be provided for decryption')
 
         if self.__strip:
@@ -97,7 +98,7 @@ class SSAGE:
             # Needed for unit tests
             sys.stdout.buffer = None
 
-        with AgeDecryptor([self.__key], data_in) as decryptor:
+        with AgeDecryptor([self.__private_key_instance], data_in) as decryptor:
             data_out.write(decryptor.read())
 
         plaintext = data_out.captured_data
@@ -130,12 +131,12 @@ class SSAGE:
         :param data: data to sign
         :return: Machine Authentication Code (MAC) for the data
         """
-        salt_data = token_bytes(32)
-        salt_data_str = b64encode(salt_data).decode('ascii')
-        hash_data = sha256(data + self.__key.private_bytes() + salt_data).digest()
-        hash_data_str = b64encode(hash_data).decode('ascii')
+        salt = token_bytes(32)
+        salt_str = b64encode(salt).decode('ascii')
+        hmac_data = hmac.new(self.__private_key.encode('ascii') + salt, data, sha256).digest()
+        hash_data_str = b64encode(hmac_data).decode('ascii')
 
-        return f"{hash_data_str}{salt_data_str}".encode('ascii')
+        return f"{hash_data_str}{salt_str}".encode('ascii')
 
     def __drop_and_verify_signature(self, data: bytes) -> bytes:
         """
@@ -160,14 +161,41 @@ class SSAGE:
         :return: True if the signature is valid
         """
         signature_raw_str = signature.decode('ascii')
-        hash_data = b64decode(signature_raw_str[:44])
-        salt_data = b64decode(signature_raw_str[44:])
+        hmac_data = b64decode(signature_raw_str[:44])
+        salt = b64decode(signature_raw_str[44:])
 
-        hash_data_expected = sha256(data + self.__key.private_bytes() + salt_data).digest()
-        if hash_data != hash_data_expected:
+        hmac_data_expected = hmac.new(self.__private_key.encode('ascii') + salt, data, sha256).digest()
+        if not hmac.compare_digest(hmac_data, hmac_data_expected):
             raise ValueError('Signature mismatch')
 
         return True
+
+    @property
+    def __private_key_instance(self) -> AgePrivateKey:
+        """
+        Get the private key
+        :return: AGE private key
+        """
+        if self.__private_key is None:
+            raise ValueError('Private key is not available')
+        return AgePrivateKey.from_private_string(self.__private_key)
+
+    @property
+    def __public_key_instance(self) -> AgePublicKey:
+        """
+        Get the public key
+        :return: AGE public key
+        """
+        if self.__public_key is None:
+            self.__public_key = self.__private_key_instance.public_key().public_string()
+        return AgePublicKey.from_public_string(self.__public_key)
+
+    def __parse_public_key(self) -> str:
+        """
+        Parse the public key from the private key
+        :return: AGE public key
+        """
+        return self.__private_key_instance.public_key().public_string()
 
     @property
     def public_key(self) -> str:
@@ -175,7 +203,7 @@ class SSAGE:
         Get the public key
         :return: AGE public key
         """
-        return self.__public_key.public_string()
+        return self.__public_key
 
     @staticmethod
     def generate_private_key() -> str:
