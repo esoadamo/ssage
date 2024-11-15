@@ -9,7 +9,7 @@ from typing import Optional, List
 from age.cli import AGE_PEM_LABEL
 
 from .backend import SSAGEBackendAge
-from .backend.io_helpers import BytesIOPersistent, StringIOPersistent
+from .backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
 
 SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 

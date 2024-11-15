@@ -5,7 +5,7 @@ from age.cli import encrypt as age_encrypt, Decryptor as AgeDecryptor, AsciiArmo
 from age.keys.agekey import AgePrivateKey, AgePublicKey
 
 from .base import SSAGEBackendBase
-from .io_helpers import TextIOToBinaryIOWrapper
+from helpers.io_helpers import TextIOToBinaryIOWrapper
 
 
 class SSAGEBackendAge(SSAGEBackendBase):
