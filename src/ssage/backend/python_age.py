@@ -9,6 +9,16 @@ from .helpers import TextIOToBinaryIOWrapper
 
 
 class SSAGEBackendAge(SSAGEBackendBase):
+    """
+    A backend for the SSAGE library that uses the AGE encryption library
+
+    Advantages:
+    - No external dependencies
+    - Run on any system where Python is installed
+    Disadvantages:
+    - No guarantee of side-channel resistance
+    """
+
     def encrypt(self, data_in: BinaryIO, data_out: TextIO, additional_recipients: Optional[str] = None) -> None:
         if not hasattr(sys.stdout, 'buffer'):
             # Needed for unit tests

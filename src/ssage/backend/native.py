@@ -9,6 +9,16 @@ from .helpers.io_helpers import TextIOToBinaryIOWrapper
 
 
 class SSAGEBackendNative(SSAGEBackendBase):
+    """
+    A backend for the SSAGE library that uses the native `age` command line tool
+
+    Advantages:
+    - Runs on any system with the `age` command line tool installed
+    Disadvantages:
+    - Requires the `age` command line tool to be installed
+    - Uses temporary files to store the private key and the encrypted data
+    """
+
     def __init__(self, private_key: Optional[str] = None, public_key: Optional[str] = None):
         self.__private_key_file: Optional[Path] = None
         super().__init__(private_key, public_key)

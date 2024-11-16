@@ -11,6 +11,25 @@ Additionally, this library provides an authenticated encryption. However, this f
 pip install ssage
 ```
 
+## Supported backends
+
+When using the `ssage` library, you can choose between backends
+which handle the actual encryption and decryption.
+Backends are chosen by passing `backend=` param to the `SSAGE` class.
+The following backends are supported:
+
+### Python age
+
+This is the default backend, and it is a pure Python implementation of the age encryption library.
+Its main advantage is that it does not require any additional dependencies,
+but does not guarantee side-channel resistance.
+
+### Native
+
+Native backend uses the `age` and `age-keygen` binaries to perform encryption and decryption.
+Its main advantage is that is runs anywhere the `age` binaries are available,
+the main disadvantage is that is stores the private key in a temporary file.
+
 ## Code Example
 
 ### Simple Authenticated Encryption
