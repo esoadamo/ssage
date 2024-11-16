@@ -1,7 +1,7 @@
 import hmac
 import sys
 from base64 import b64encode, b64decode
-from hashlib import sha256
+from hashlib import sha256, pbkdf2_hmac
 from io import BytesIO, StringIO
 from secrets import token_bytes
 from typing import Optional, List, Type
@@ -33,6 +33,7 @@ class SSAGE:
         self.__backend = backend(private_key, public_key)
         self.__strip = strip
         self.__authenticate = authenticate if authenticate is not None else bool(private_key)
+        self.__authentication_key: Optional[bytes] = None
 
     def encrypt_bytes(self, data: bytes, authenticate: Optional[bool] = None, additional_recipients: Optional[List[str]] = None) -> str:
         """
@@ -110,15 +111,19 @@ class SSAGE:
         """
         return self.decrypt_bytes(data, authenticate=authenticate).decode('utf-8')
     
-    def __mac(self, data: bytes) -> bytes:
+    def __mac(self, data: bytes, salt: Optional[bytes] = None) -> bytes:
         """
         Generate a signature for the data
         :param data: data to sign
         :return: Machine Authentication Code (MAC) for the data
         """
-        salt = token_bytes(32)
+        salt = salt if salt is not None else token_bytes(32)
         salt_str = b64encode(salt).decode('ascii')
-        hmac_data = hmac.new(self.__backend.private_key.encode('ascii') + salt, data, sha256).digest()
+
+        if self.__authentication_key is None:
+            self.__authentication_key = pbkdf2_hmac('sha256', self.__backend.private_key.encode('ascii'), salt, 600000)
+
+        hmac_data = hmac.new(self.__authentication_key, data, sha256).digest()
         hash_data_str = b64encode(hmac_data).decode('ascii')
 
         return f"{hash_data_str}{salt_str}".encode('ascii')
@@ -146,13 +151,9 @@ class SSAGE:
         :return: True if the signature is valid
         """
         signature_raw_str = signature.decode('ascii')
-        hmac_data = b64decode(signature_raw_str[:44])
         salt = b64decode(signature_raw_str[44:])
-
-        hmac_data_expected = hmac.new(self.__backend.private_key.encode('ascii') + salt, data, sha256).digest()
-        if not hmac.compare_digest(hmac_data, hmac_data_expected):
+        if not hmac.compare_digest(signature, self.__mac(data, salt)):
             raise ValueError('Signature mismatch')
-
         return True
 
     @property
