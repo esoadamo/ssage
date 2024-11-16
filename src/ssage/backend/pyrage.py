@@ -7,8 +7,9 @@ from .base import SSAGEBackendBase
 
 try:
     from pyrage.x25519 import Identity, Recipient
+    from pyrage import encrypt, decrypt
 except ImportError:
-    Identity = Recipient = None
+    Identity = Recipient = encrypt = decrypt = None
 
 
 class SSAGEBackendPyrage(SSAGEBackendBase):
@@ -30,8 +31,6 @@ class SSAGEBackendPyrage(SSAGEBackendBase):
         super().__init__(private_key, public_key)
 
     def encrypt(self, data_in: BinaryIO, data_out: TextIO, additional_recipients: Optional[str] = None) -> None:
-        from pyrage import encrypt
-
         data = data_in.read()
         recipients = [self.__public_key_instance] + ([Recipient.from_str(x) for x in additional_recipients] if additional_recipients is not None else [])
         encrypted_data = encrypt(data, recipients)
@@ -39,8 +38,6 @@ class SSAGEBackendPyrage(SSAGEBackendBase):
         data_out.write(armored)
 
     def decrypt(self, data_in: TextIO, data_out: BinaryIO) -> None:
-        from pyrage import decrypt
-
         armored_data = data_in.read()
         dearmored = Armored(armored_data).dearmored_data
         decrypted_data = decrypt(dearmored, [self.__private_key_instance])
@@ -63,7 +60,7 @@ class SSAGEBackendPyrage(SSAGEBackendBase):
         Get the public key
         :return: AGE public key
         """
-        return self.__private_key_instance.to_public()
+        return self.__private_key_instance.to_public() if self.private_key else Recipient.from_str(self.public_key)
 
     def parse_public_key(self) -> str:
         """

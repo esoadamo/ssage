@@ -8,9 +8,12 @@ from typing import Optional, List, Type
 
 from age.cli import AGE_PEM_LABEL
 
-from backend import SSAGEBackendAge
-from backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
-from src.ssage.backend import SSAGEBackendBase
+try:
+    from .backend import SSAGEBackendAge, SSAGEBackendBase
+    from .backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
+except ImportError:
+    from backend import SSAGEBackendAge, SSAGEBackendBase
+    from backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
 
 SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 
