@@ -10,6 +10,7 @@ from age.cli import AGE_PEM_LABEL
 
 from backend import SSAGEBackendAge
 from backend.helpers.io_helpers import BytesIOPersistent, StringIOPersistent
+from src.ssage.backend import SSAGEBackendBase
 
 SSAGE_SIGNATURE_SEPARATOR = b'|1|'
 
@@ -19,7 +20,7 @@ class SSAGE:
     A simple wrapper around the AGE encryption library to provide a more user-friendly interface
     """
 
-    def __init__(self, private_key: Optional[str] = None, strip: bool = True, authenticate: Optional[bool] = None, public_key: Optional[str] = None, backend: Type[SSAGEBackendAge] = SSAGEBackendAge):
+    def __init__(self, private_key: Optional[str] = None, strip: bool = True, authenticate: Optional[bool] = None, public_key: Optional[str] = None, backend: Type[SSAGEBackendBase] = SSAGEBackendAge):
         """
         Initialize the SSAGE object
         :param private_key: AGE private key, if not provided decryption and authenticated encryption will not be available

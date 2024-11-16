@@ -30,6 +30,12 @@ Native backend uses the `age` and `age-keygen` binaries to perform encryption an
 Its main advantage is that is runs anywhere the `age` binaries are available,
 the main disadvantage is that is stores the private key in a temporary file.
 
+### Pyrage
+
+Pyrage is using a Rust-based binding for the age encryption.
+Main advantage is that it is faster than the Python age backend, but
+the Rust library needs to be compiled for the target platform.
+
 ## Code Example
 
 ### Simple Authenticated Encryption
