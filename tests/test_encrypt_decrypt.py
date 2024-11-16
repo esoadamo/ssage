@@ -8,7 +8,7 @@ import age.exceptions
 from src.ssage import SSAGE
 from src.ssage.backend import SSAGEBackendAge, SSAGEBackendPyrage, SSAGEBackendNative
 
-BACKENDS = [SSAGEBackendAge, SSAGEBackendPyrage]
+BACKENDS = [SSAGEBackendAge, SSAGEBackendPyrage, SSAGEBackendNative]
 
 class TestEncryptDecrypt(unittest.TestCase):
     @parameterized.expand(BACKENDS)
@@ -61,7 +61,7 @@ class TestEncryptDecrypt(unittest.TestCase):
         encrypted = e.encrypt('Hello, world!')
         e = SSAGE(SSAGE.generate_private_key(), backend=backend, authenticate=True)
         # noinspection PyTypeChecker
-        with self.assertRaises((age.exceptions.NoIdentity, pyrage.pyrage.DecryptError)):
+        with self.assertRaises((age.exceptions.NoIdentity, pyrage.pyrage.DecryptError, ValueError)):
             e.decrypt(encrypted)
 
 class TestConstructorParams(unittest.TestCase):

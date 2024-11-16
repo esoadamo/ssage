@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from subprocess import Popen, PIPE, check_output
+from subprocess import Popen, PIPE, check_output, DEVNULL
 from typing import Optional, TextIO, BinaryIO
 
 
@@ -30,16 +30,25 @@ class SSAGEBackendNative(SSAGEBackendBase):
     def encrypt(self, data_in: BinaryIO, data_out: TextIO, additional_recipients: Optional[str] = None) -> None:
         data_out_binary = TextIOToBinaryIOWrapper(data_out)
         recipients = [self.public_key] + (additional_recipients or [])
-        command = ['age', '-a', '-r', *recipients]
+        command = ['age', '-a']
+        for recipient in recipients:
+            command += ['-r', recipient]
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
-            process = Popen(command, stdin=PIPE, stdout=temp_file)
+            process = Popen(command, stdin=PIPE, stdout=temp_file, stderr=DEVNULL)
             while data := data_in.read(4096):
                 process.stdin.write(data)
+            data_in.close()
             process.stdin.close()
             process.wait()
-            with open(temp_file.name, 'rb') as temp_file_read:
-                while data := temp_file_read.read(4096):
-                    data_out_binary.write(data)
+
+            if process.returncode != 0:
+                data_out_binary.close()
+                raise ValueError('Failed to encrypt data')
+
+            temp_file.seek(0)
+            while data := temp_file.read(4096):
+                data_out_binary.write(data)
+            data_out_binary.close()
 
     def decrypt(self, data_in: TextIO, data_out: BinaryIO) -> None:
         data_in_binary = TextIOToBinaryIOWrapper(data_in)
@@ -47,13 +56,20 @@ class SSAGEBackendNative(SSAGEBackendBase):
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             while data := data_in_binary.read(4096):
                 temp_file.write(data)
+            data_in_binary.close()
             temp_file.flush()
             temp_file.seek(0)
             command = ['age', '-d', '-i', str(self.__get_private_key_file().absolute()), temp_file.name]
-            process = Popen(command, stdout=PIPE)
-            process.wait()
-            while data := process.stdout.read(4096):
-                data_out.write(data)
+            with Popen(command, stdout=PIPE, stderr=DEVNULL) as process:
+                process.wait()
+
+                if process.returncode != 0:
+                    data_out.close()
+                    raise ValueError('Failed to decrypt data')
+
+                while data := process.stdout.read(4096):
+                    data_out.write(data)
+        data_out.close()
 
     def __get_private_key_file(self) -> Path:
         if self.__private_key_file is None:

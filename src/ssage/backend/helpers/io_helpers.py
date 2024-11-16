@@ -19,7 +19,7 @@ class BytesIOPersistent(BytesIO):
     @property
     def captured_data(self):
         if not self.closed:
-            return self.getvalue()
+            self.close()
 
         data = self.__captured_data
         self.__captured_data = None
@@ -42,7 +42,7 @@ class StringIOPersistent(StringIO):
     @property
     def captured_data(self):
         if not self.closed:
-            return self.getvalue()
+            self.close()
 
         data = self.__captured_data
         self.__captured_data = None
@@ -53,6 +53,10 @@ class TextIOToBinaryIOWrapper(BinaryIO, ABC):
     def __init__(self, text_stream: TextIO, encoding: str = 'ascii'):
         self.text_stream = text_stream
         self.__encoding = encoding
+
+    def close(self) -> None:
+        # Close the TextIO stream
+        self.text_stream.close()
 
     def read(self, size=-1) -> bytes:
         # Read a chunk of text from the TextIO stream
