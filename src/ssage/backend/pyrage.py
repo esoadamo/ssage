@@ -1,7 +1,7 @@
 import binascii
 import re
 from dataclasses import dataclass
-from typing import Optional, TextIO, BinaryIO
+from typing import Optional, TextIO, BinaryIO, Union
 
 from .base import SSAGEBackendBase
 
@@ -103,7 +103,7 @@ class Armored:
     def dearmored_data(self) -> bytes:
         return self._dearmored_data
 
-    def __init__(self, data: bytes | str) -> None:
+    def __init__(self, data: Union[bytes, str]) -> None:
         if isinstance(data, bytes):
             self._armored_data = self._armor(data)
             self._dearmored_data = self._dearmor(self._armored_data)
@@ -132,7 +132,7 @@ class Armored:
             raise ValueError('Invalid Base64 encoding detected.')
 
         try:
-            decoded_data = binascii.a2b_base64(b64_str, strict_mode=True)
+            decoded_data = binascii.a2b_base64(b64_str)
         except binascii.Error as exc:
             raise ValueError('Base64 decoding error: ' + str(exc)) from exc
         return decoded_data
