@@ -22,7 +22,7 @@ The following backends are supported:
 
 This is the default backend, and it is a pure Python implementation of the age encryption library.
 Its main advantage is that it does not require any additional dependencies,
-but does not guarantee side-channel resistance.
+but does not guarantee side-channel resistance, nor multi-threading support.
 
 ### Native
 
@@ -38,11 +38,24 @@ the Rust library needs to be compiled for the target platform.
 
 ## Code Example
 
-### Simple Authenticated Encryption
+### Simple Encryption
 
 ```python
 from ssage import SSAGE
 e = SSAGE(SSAGE.generate_private_key())
+encrypted = e.encrypt('Hello, world!')
+print(encrypted)
+decrypted = e.decrypt(encrypted)
+print(decrypted)
+assert decrypted == 'Hello, world!'
+print('Test passed!')
+```
+
+### Simple Authenticated Encryption
+
+```python
+from ssage import SSAGE
+e = SSAGE(SSAGE.generate_private_key(), strip=True, authenticate=True)
 encrypted = e.encrypt('Hello, world!')
 print(encrypted)
 decrypted = e.decrypt(encrypted)

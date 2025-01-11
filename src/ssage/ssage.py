@@ -23,12 +23,12 @@ class SSAGE:
     A simple wrapper around the AGE encryption library to provide a more user-friendly interface
     """
 
-    def __init__(self, private_key: Optional[str] = None, strip: bool = True, authenticate: Optional[bool] = None, public_key: Optional[str] = None, backend: Type[SSAGEBackendBase] = SSAGEBackendAge):
+    def __init__(self, private_key: Optional[str] = None, strip: bool = False, authenticate: Optional[bool] = False, public_key: Optional[str] = None, backend: Type[SSAGEBackendBase] = SSAGEBackendAge):
         """
         Initialize the SSAGE object
         :param private_key: AGE private key, if not provided decryption and authenticated encryption will not be available
         :param strip: whether to return single-line ASCII armored data, if set to False the data will be returned with PEM headers
-        :param authenticate: whether to authenticate the data, if set to False the data can be forged by anyone with the public key. Default is True if private_key is provided, False if only public_key is provided
+        :param authenticate: whether to authenticate the data, if set to False the data can be forged by anyone with the public key. None equals to True if private_key is provided, False if only public_key is provided.
         :param public_key: AGE public key, if not provided it will be derived from the private key
         """
         if private_key is None and authenticate:
