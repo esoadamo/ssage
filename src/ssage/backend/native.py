@@ -53,12 +53,12 @@ class SSAGEBackendNative(SSAGEBackendBase):
     def decrypt(self, data_in: TextIO, data_out: BinaryIO) -> None:
         data_in_binary = TextIOToBinaryIOWrapper(data_in)
 
-        with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=True, delete_on_close=False) as temp_file:
             while data := data_in_binary.read(4096):
                 temp_file.write(data)
             data_in_binary.close()
             temp_file.flush()
-            temp_file.seek(0)
+            temp_file.close()
             command = ['age', '-d', '-i', str(self.__get_private_key_file().absolute()), temp_file.name]
             with Popen(command, stdout=PIPE, stderr=DEVNULL) as process:
                 process.wait()
