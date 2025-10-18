@@ -1,14 +1,18 @@
 import unittest
-
-import pyrage.pyrage
-from parameterized import parameterized
+from secrets import token_hex
+from threading import Thread
+from time import time
+from typing import Set
 
 import age.exceptions
+import pyrage.pyrage
+from parameterized import parameterized
 
 from src.ssage import SSAGE
 from src.ssage.backend import SSAGEBackendAge, SSAGEBackendPyrage, SSAGEBackendNative
 
 BACKENDS = [SSAGEBackendAge, SSAGEBackendPyrage, SSAGEBackendNative]
+
 
 class TestEncryptDecrypt(unittest.TestCase):
     @parameterized.expand(BACKENDS)
@@ -26,8 +30,51 @@ class TestEncryptDecrypt(unittest.TestCase):
         self.assertEqual(decrypted, 'Hello, world!')
 
     @parameterized.expand(BACKENDS)
+    def test_encrypt_decrypt_multiple_keys(self, backend):
+        key1 = SSAGE.generate_private_key()
+        key2 = SSAGE.generate_private_key()
+        self.assertNotEqual(key1, key2)
+        e1 = SSAGE(key1, backend=backend, authenticate=True, strip=True)
+        e2 = SSAGE(key2, backend=backend, authenticate=True, strip=True)
+        encrypted1 = e1.encrypt('Hello, world!')
+        encrypted2 = e2.encrypt('Hello, world!')
+        self.assertNotEqual(encrypted1, encrypted2)
+        decrypted1 = e1.decrypt(encrypted1)
+        decrypted2 = e2.decrypt(encrypted2)
+        self.assertEqual(decrypted1, 'Hello, world!')
+        self.assertEqual(decrypted2, 'Hello, world!')
+        key3 = SSAGE.generate_private_key()
+        e3 = SSAGE(key3, backend=backend, authenticate=True, strip=True)
+        self.assertNotEqual(key1, key3)
+        encrypted3 = e3.encrypt('Hello, world!')
+        self.assertNotEqual(encrypted1, encrypted3)
+        decrypted3 = e3.decrypt(encrypted3)
+        self.assertEqual(decrypted3, 'Hello, world!')
+
+    @parameterized.expand(BACKENDS)
+    def test_thread_safe(self, backend):
+        results: Set[bool] = set()
+        time_start = time()
+
+        def worker():
+            while time() - time_start < 2:
+                encryptor = SSAGE(SSAGE.generate_private_key(), backend=backend, authenticate=True, strip=True)
+                message = token_hex(128)
+                encrypted = encryptor.encrypt(message)
+                decrypted = encryptor.decrypt(encrypted)
+                results.add(decrypted == message)
+
+        threads = [Thread(target=worker, daemon=True) for _ in range(16)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(results, {True})
+
+    @parameterized.expand(BACKENDS)
     def test_encrypt_decrypt_invalid_signature(self, backend):
-        e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", backend=backend, authenticate=True)
+        e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", backend=backend,
+                  authenticate=True)
         plaintext = "PateXS6PfCYjq+r30YODvBVL0huZOx3BMVBoMzEgLj0=4E7zW8ZI1zRmaeWUPZfWra3uWSMPgSfijHpIXNTpTXc=|1|Hello, world!"
         encrypted = e.encrypt(plaintext, authenticate=False)
         self.assertTrue(e.decrypt(encrypted, authenticate=False))
@@ -40,7 +87,8 @@ class TestEncryptDecrypt(unittest.TestCase):
 
     @parameterized.expand(BACKENDS)
     def test_encrypt_decrypt_forged_message(self, backend):
-        e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", backend=backend, authenticate=True)
+        e = SSAGE("AGE-SECRET-KEY-1SPCSCWGZ28QND3D7CK62JF44T9SVVRCDCGWRL2CX4S7ZNZC76EMSDCKJ3M", backend=backend,
+                  authenticate=True)
         plaintext = "PateXS6PfCYjq+r30YODvBVL0huZOx3BMVBoMzEgLj0=4E7zW8ZI1zRmaeWUPZfWra3uWSMPgSfijHpIXNTpTXc=|1|Hello, world!"
         plaintext = plaintext[:-1] + "."
         encrypted = e.encrypt(plaintext, authenticate=False)
@@ -64,11 +112,13 @@ class TestEncryptDecrypt(unittest.TestCase):
         with self.assertRaises((age.exceptions.NoIdentity, pyrage.pyrage.DecryptError, ValueError)):
             e.decrypt(encrypted)
 
+
 class TestConstructorParams(unittest.TestCase):
     @parameterized.expand(BACKENDS)
     def test_both_public_and_private_keys(self, backend):
         with self.assertRaises(ValueError):
-            SSAGE(SSAGE.generate_private_key(), public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend)
+            SSAGE(SSAGE.generate_private_key(),
+                  public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend)
 
     @parameterized.expand(BACKENDS)
     def test_no_keys(self, backend):
@@ -78,7 +128,9 @@ class TestConstructorParams(unittest.TestCase):
     @parameterized.expand(BACKENDS)
     def test_public_key_only_and_authenticate(self, backend):
         with self.assertRaises(ValueError):
-            SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend, authenticate=True)
+            SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend,
+                  authenticate=True)
+
 
 class TestPublicKeyOnly(unittest.TestCase):
     @parameterized.expand(BACKENDS)
@@ -88,27 +140,32 @@ class TestPublicKeyOnly(unittest.TestCase):
 
     @parameterized.expand(BACKENDS)
     def test_public_key_only_auth_encryption(self, backend):
-        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend, authenticate=False)
+        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend,
+                  authenticate=False)
         with self.assertRaises(ValueError):
             e.encrypt('Hello, world!', authenticate=True)
 
     @parameterized.expand(BACKENDS)
     def test_public_key_only_no_signature(self, backend):
-        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend, authenticate=False)
+        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend,
+                  authenticate=False)
         self.assertTrue(e.encrypt('Hello, world!'))
 
     @parameterized.expand(BACKENDS)
     def test_public_key_only_no_signature_decrypt(self, backend):
-        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend, authenticate=False)
+        e = SSAGE(public_key="age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5", backend=backend,
+                  authenticate=False)
         encrypted = e.encrypt('Hello, world!')
         with self.assertRaises(ValueError):
             e.decrypt(encrypted)
+
 
 class TestAdditionalRecipients(unittest.TestCase):
     @parameterized.expand(BACKENDS)
     def test_additional_recipients(self, backend):
         e = SSAGE(SSAGE.generate_private_key(), backend=backend, authenticate=False)
-        encrypted = e.encrypt('Hello, world!', additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"])
+        encrypted = e.encrypt('Hello, world!',
+                              additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"])
         decrypted = e.decrypt(encrypted)
         self.assertEqual(decrypted, 'Hello, world!')
 
@@ -116,13 +173,17 @@ class TestAdditionalRecipients(unittest.TestCase):
     def test_additional_recipients_authenticated(self, backend):
         e = SSAGE(SSAGE.generate_private_key(), backend=backend, authenticate=True)
         with self.assertRaises(ValueError):
-            e.encrypt('Hello, world!', additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"])
+            e.encrypt('Hello, world!',
+                      additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"])
 
     @parameterized.expand(BACKENDS)
     def test_additional_recipients_authenticated_explicit(self, backend):
         e = SSAGE(SSAGE.generate_private_key(), backend=backend, authenticate=False)
         with self.assertRaises(ValueError):
-            e.encrypt('Hello, world!', additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"], authenticate=True)
+            e.encrypt('Hello, world!',
+                      additional_recipients=["age1u2l868p8kvyulzaccugynydssh8hmrhv737fg8p9lja80jvpn4gqmjtxy5"],
+                      authenticate=True)
+
 
 if __name__ == '__main__':
     unittest.main()
