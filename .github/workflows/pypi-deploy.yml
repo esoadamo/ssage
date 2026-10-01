@@ -17,22 +17,18 @@ jobs:
     steps:
       # retrieve your distributions here
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.12'
+        run: uv python install 3.12
       - name: Install dependencies
         run: |
           sudo apt-get install -y age
-          python -m pip install --upgrade pip
-          pip install setuptools wheel twine build
+          uv sync --group dev --group pyrage
       - name: Run tests
-        run: |
-          pip install -r requirements.txt
-          python -m unittest discover tests
-      - name: Build and publish
-        run: |
-          python -m build
+        run: uv run python -m unittest discover tests
+      - name: Build
+        run: uv build
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@ec4db0b4ddc65acdf4bff5fa45ac92d78b56bdf0 # v1.9.0

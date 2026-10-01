@@ -1,10 +1,6 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "ssage"
-version = "1.5.1"
+version = "1.5.2"
 description = "Super-Simple AGE - A wrapper around python age (actually good encryption)"
 authors = [
     { name = "Adam Hlavacek", email = "git@adamhlavacek.com" }
@@ -15,11 +11,31 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 readme = "README.md"
+requires-python = ">=3.10"
 dependencies = [
-    "age==0.5.1"
+    "age>=0.5.1",
+    "urllib3>=2.8.0",
 ]
 
+[dependency-groups]
+dev = [
+    "parameterized>=0.9.0",
+]
+pyrage = [
+    "pyrage>=1.4.0",
+    "pyrage-stubs>=1.4.0",
+]
+
+[project.optional-dependencies]
+pyrage = [
+    "pyrage>=1.4.0",
+    "pyrage-stubs>=1.4.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/esoadamo/ssage"
 Issues = "https://github.com/esoadamo/ssage/issues"
+
+[build-system]
+requires = ["setuptools<75"]
+build-backend = "setuptools.build_meta"

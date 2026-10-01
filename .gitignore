@@ -3,4 +3,4 @@
 __pycache__
 *.pyc
 dist
-src/ssage.egg-info
+*.egg-info
